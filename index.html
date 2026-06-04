@@ -453,6 +453,13 @@ document.getElementById('btn-sortear').addEventListener('click', async function(
         `Apresente o voucher <strong>${data.voucher_codigo}</strong> no balcão.`;
       document.getElementById('already-view').classList.add('visible');
 
+    } else if (data.erro === 'sorteio_encerrado') {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('already-sub').innerHTML =
+        'O sorteio de hoje foi encerrado.<br><br>' +
+        'As vagas foram preenchidas. Volte na próxima promoção! ☕';
+      document.getElementById('already-view').classList.add('visible');
+
     } else if (data.erro === 'limite_ip_atingido') {
       showError('err-name', 'Muitas participações deste local hoje. Tente amanhã.');
 

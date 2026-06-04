@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Club do Café — Painel da Gerente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0F0E0C; --bg-soft: #1A1815; --bg-card: #211E1A;
+    --cream: #F5E6D3; --cream-soft: #E8D5BC; --cream-dim: #B5A488;
+    --accent: #D4A574; --danger: #E07A5F; --success: #6DBF8A;
+    --border: rgba(245,230,211,0.12); --border-soft: rgba(245,230,211,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg); color: var(--cream);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(circle at 15% 25%, rgba(212,165,116,0.06) 0%, transparent 50%),
+                radial-gradient(circle at 85% 75%, rgba(245,230,211,0.03) 0%, transparent 50%);
+  }
+
+  /* LOGIN */
+  .login-wrap {
+    position: relative; z-index: 1;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2rem 1.5rem;
+  }
+  .login-box {
+    background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: 24px; padding: 2.5rem 2rem; width: 100%; max-width: 380px;
+    position: relative; overflow: hidden;
+  }
+  .login-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cream), transparent); opacity: 0.25;
+  }
+  .login-logo { text-align: center; margin-bottom: 1.75rem; }
+  .login-logo img { max-width: 140px; width: 55%; }
+  .login-title {
+    font-family: 'Bagel Fat One', cursive; font-size: 1.5rem;
+    text-align: center; margin-bottom: 0.4rem;
+  }
+  .login-sub { text-align: center; font-size: 0.88rem; color: var(--cream-dim); margin-bottom: 1.75rem; }
+  .field { margin-bottom: 1rem; }
+  .field label {
+    display: block; font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--cream-dim); margin-bottom: 0.45rem;
+  }
+  .field input {
+    width: 100%; font-family: 'DM Sans', sans-serif; font-size: 1rem;
+    padding: 0.8rem 1rem; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--bg); color: var(--cream);
+    outline: none; transition: border-color 0.18s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: rgba(245,230,211,0.3); }
+  .btn {
+    width: 100%; padding: 0.95rem; font-family: 'DM Sans', sans-serif;
+    font-size: 1rem; font-weight: 600; background: var(--cream);
+    color: var(--bg); border: none; border-radius: 14px; cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s; margin-top: 0.25rem;
+  }
+  .btn:hover { opacity: 0.9; } .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .err-msg { font-size: 0.8rem; color: var(--danger); margin-top: 0.75rem; text-align: center; display: none; }
+
+  /* DASHBOARD */
+  #dashboard { display: none; position: relative; z-index: 1; min-height: 100vh; }
+
+  .topbar {
+    background: var(--bg-soft); border-bottom: 1px solid var(--border);
+    padding: 0.9rem 1.5rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .topbar-brand img { height: 32px; }
+  .topbar-brand span {
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--cream-dim);
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+  .badge-status {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.72rem;
+    font-weight: 500; letter-spacing: 0.06em;
+  }
+  .badge-ativo  { background: rgba(109,191,138,0.15); color: var(--success); border: 1px solid rgba(109,191,138,0.3); }
+  .badge-limite { background: rgba(224,122,95,0.15); color: var(--danger); border: 1px solid rgba(224,122,95,0.3); }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .btn-sm {
+    padding: 0.4rem 0.9rem; font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem; font-weight: 500; border-radius: 8px; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-csv { background: var(--accent); color: var(--bg); border: none; }
+  .btn-sair { background: transparent; color: var(--cream-dim); border: 1px solid var(--border); }
+  .btn-sm:hover { opacity: 0.8; }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+  .stat-card {
+    background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: 16px; padding: 1.25rem 1.5rem;
+  }
+  .stat-label { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cream-dim); margin-bottom: 0.5rem; }
+  .stat-value { font-family: 'Bagel Fat One', cursive; font-size: 2.2rem; color: var(--cream); line-height: 1; }
+  .stat-sub { font-size: 0.78rem; color: var(--cream-dim); margin-top: 0.3rem; }
+
+  /* BARRA DE PROGRESSO */
+  .progress-wrap { margin-bottom: 1.75rem; }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+  .progress-label { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--cream-dim); }
+  .progress-track {
+    height: 8px; background: var(--bg-soft); border-radius: 999px;
+    border: 1px solid var(--border); overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent); border-radius: 999px;
+    transition: width 0.6s ease;
+  }
+  .progress-fill.danger { background: var(--danger); }
+
+  /* REFRESH */
+  .refresh-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .refresh-info { font-size: 0.78rem; color: var(--cream-dim); }
+  .refresh-info strong { color: var(--cream); }
+
+  /* TABELA */
+  .table-wrap {
+    background: var(--bg-soft); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+  }
+  .table-search-row {
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-soft);
+  }
+  .table-search {
+    width: 100%; max-width: 320px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem; padding: 0.55rem 0.9rem; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--cream); outline: none;
+    transition: border-color 0.18s;
+  }
+  .table-search:focus { border-color: var(--accent); }
+  .table-search::placeholder { color: rgba(245,230,211,0.3); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th {
+    padding: 0.75rem 1.25rem; text-align: left; font-size: 0.68rem;
+    font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--cream-dim); white-space: nowrap;
+  }
+  td {
+    padding: 0.8rem 1.25rem; font-size: 0.9rem; color: var(--cream-soft);
+    border-bottom: 1px solid var(--border-soft); vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(245,230,211,0.025); }
+
+  .td-nome { font-weight: 500; color: var(--cream); }
+  .td-tel  { font-size: 0.82rem; color: var(--cream-dim); font-feature-settings: "tnum"; }
+  .td-premio { display: flex; align-items: center; gap: 0.5rem; }
+  .td-code {
+    font-family: 'Bagel Fat One', cursive; font-size: 0.95rem;
+    color: var(--accent); letter-spacing: 0.04em;
+  }
+  .td-date { font-size: 0.78rem; color: var(--cream-dim); white-space: nowrap; }
+
+  .empty-row td {
+    text-align: center; padding: 3rem; color: var(--cream-dim); font-size: 0.9rem;
+  }
+
+  /* SPINNER */
+  .spin-wrap { display: flex; align-items: center; justify-content: center; gap: 0.7rem; padding: 2rem; color: var(--cream-dim); font-size: 0.85rem; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--cream); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 640px) {
+    .th-ip, .td-ip { display: none; }
+    .topbar { padding: 0.75rem 1rem; }
+    .main { padding: 1.25rem 1rem; }
+    th, td { padding: 0.65rem 0.9rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="logo.png" alt="Club do Café" />
+    </div>
+    <p class="login-title">Painel da Gerente</p>
+    <p class="login-sub">Acesso restrito — insira a senha para continuar</p>
+    <div class="field">
+      <label for="inp-senha">Senha</label>
+      <input id="inp-senha" type="password" placeholder="••••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn" id="btn-entrar">Entrar</button>
+    <p class="err-msg" id="err-login">Senha incorreta. Tente novamente.</p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <div class="topbar">
+    <div class="topbar-brand">
+      <img src="logo.png" alt="Club do Café" />
+      <span>Painel da Gerente</span>
+    </div>
+    <div class="topbar-actions">
+      <span class="badge-status badge-ativo" id="badge-status">
+        <span class="badge-dot"></span>
+        <span id="badge-txt">Ativo</span>
+      </span>
+      <button class="btn-sm btn-csv" id="btn-csv">⬇ Exportar CSV</button>
+      <button class="btn-sm btn-sair" id="btn-sair">Sair</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="stats" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Participantes</div>
+        <div class="stat-value" id="st-total">—</div>
+        <div class="stat-sub" id="st-sub">carregando…</div>
+      </div>
+      <div class="stat-card" id="stat-hoje-card">
+        <div class="stat-label">Hoje</div>
+        <div class="stat-value" id="st-hoje">—</div>
+        <div class="stat-sub">participantes nas últimas 24h</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Prêmio mais sortido</div>
+        <div class="stat-value" style="font-size:1.3rem;padding-top:0.3rem" id="st-top">—</div>
+        <div class="stat-sub" id="st-top-n"></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progress-wrap" style="display:none">
+      <div class="progress-header">
+        <span class="progress-label">Vagas utilizadas</span>
+        <span class="refresh-info" id="progress-pct"></span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="refresh-bar">
+      <span class="refresh-info">Atualiza em <strong id="countdown">30</strong>s</span>
+      <button class="btn-sm btn-sair" id="btn-refresh" style="font-size:0.75rem">↻ Atualizar agora</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-search-row">
+        <input type="search" class="table-search" id="search-inp" placeholder="Buscar por nome, telefone ou código…" />
+      </div>
+      <div id="table-area">
+        <div class="spin-wrap"><div class="spinner"></div><span>Carregando…</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://ubheosijktvvnpgrsylm.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaGVvc2lqa3R2dm5wZ3JzeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjgzNDUsImV4cCI6MjA5NjE0NDM0NX0.CiyQLUiPwxcQ-4tp-LnVUp-eJNcGut5h4MTbPVnkPVw';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let allRows = [];
+let senhaAtual = '';
+let countdownVal = 30;
+let countdownTimer = null;
+
+/* ── LOGIN ─────────────────────────────────────────────── */
+document.getElementById('inp-senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') tentarLogin();
+});
+document.getElementById('btn-entrar').addEventListener('click', tentarLogin);
+
+async function tentarLogin() {
+  const senha = document.getElementById('inp-senha').value;
+  if (!senha) return;
+
+  const btn = document.getElementById('btn-entrar');
+  btn.disabled = true; btn.textContent = 'Verificando…';
+  document.getElementById('err-login').style.display = 'none';
+
+  const { data, error } = await db.rpc('listar_participantes', { p_senha: senha });
+
+  btn.disabled = false; btn.textContent = 'Entrar';
+
+  if (error || data?.erro === 'senha_invalida') {
+    document.getElementById('err-login').style.display = 'block';
+    return;
+  }
+
+  senhaAtual = senha;
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  renderDashboard(data);
+  startCountdown();
+}
+
+/* ── SAIR ───────────────────────────────────────────────── */
+document.getElementById('btn-sair').addEventListener('click', () => {
+  clearInterval(countdownTimer);
+  senhaAtual = '';
+  document.getElementById('inp-senha').value = '';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('login-wrap').style.display = 'flex';
+});
+
+/* ── ATUALIZAR ──────────────────────────────────────────── */
+document.getElementById('btn-refresh').addEventListener('click', () => {
+  countdownVal = 30;
+  carregar();
+});
+
+async function carregar() {
+  const { data, error } = await db.rpc('listar_participantes', { p_senha: senhaAtual });
+  if (!error && data?.sucesso) renderDashboard(data);
+}
+
+function startCountdown() {
+  clearInterval(countdownTimer);
+  countdownVal = 30;
+  countdownTimer = setInterval(() => {
+    countdownVal--;
+    document.getElementById('countdown').textContent = countdownVal;
+    if (countdownVal <= 0) {
+      countdownVal = 30;
+      carregar();
+    }
+  }, 1000);
+}
+
+/* ── RENDER ─────────────────────────────────────────────── */
+function renderDashboard(data) {
+  const rows = data.participantes || [];
+  const total = data.total || 0;
+  const maxPart = data.max_participantes || 0;
+  allRows = rows;
+
+  // Stats
+  document.getElementById('st-total').textContent = total;
+  document.getElementById('st-sub').textContent = maxPart > 0
+    ? `de ${maxPart} vagas (${maxPart - total} restantes)`
+    : 'participantes no total';
+
+  // Hoje (últimas 24h) — conta pelos timestamps
+  const agora = Date.now();
+  const hoje = rows.filter(r => {
+    const [d, m, y, H, M] = r.criado_em.match(/(\d+)\/(\d+)\/(\d+) (\d+):(\d+)/).slice(1);
+    const ts = new Date(`${y}-${m}-${d}T${H}:${M}:00-03:00`).getTime();
+    return agora - ts < 86400000;
+  }).length;
+  document.getElementById('st-hoje').textContent = hoje;
+
+  // Prêmio mais sortido
+  const contagem = {};
+  rows.forEach(r => { contagem[r.premio_nome] = (contagem[r.premio_nome] || 0) + 1; });
+  const top = Object.entries(contagem).sort((a,b) => b[1]-a[1])[0];
+  if (top) {
+    const rowTop = rows.find(r => r.premio_nome === top[0]);
+    document.getElementById('st-top').textContent = (rowTop?.premio_icone || '') + ' ' + top[0];
+    document.getElementById('st-top-n').textContent = `${top[1]} vez${top[1] > 1 ? 'es' : ''} sorteado`;
+  } else {
+    document.getElementById('st-top').textContent = '—';
+    document.getElementById('st-top-n').textContent = 'sem dados ainda';
+  }
+
+  // Barra de progresso
+  if (maxPart > 0) {
+    const pct = Math.min(100, Math.round((total / maxPart) * 100));
+    document.getElementById('progress-wrap').style.display = 'block';
+    document.getElementById('progress-pct').textContent = `${total} / ${maxPart} (${pct}%)`;
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'progress-fill' + (pct >= 90 ? ' danger' : '');
+  }
+
+  // Badge
+  const encerrado = maxPart > 0 && total >= maxPart;
+  const badge = document.getElementById('badge-status');
+  badge.className = 'badge-status ' + (encerrado ? 'badge-limite' : 'badge-ativo');
+  document.getElementById('badge-txt').textContent = encerrado ? 'Encerrado' : 'Ativo';
+
+  renderTabela(rows);
+}
+
+function renderTabela(rows) {
+  const filtro = document.getElementById('search-inp').value.toLowerCase().trim();
+  const filtrado = filtro
+    ? rows.filter(r =>
+        r.nome.toLowerCase().includes(filtro) ||
+        r.telefone.includes(filtro) ||
+        r.voucher_codigo.toLowerCase().includes(filtro)
+      )
+    : rows;
+
+  if (filtrado.length === 0) {
+    document.getElementById('table-area').innerHTML = `
+      <table><tbody><tr class="empty-row"><td colspan="5">
+        ${filtro ? 'Nenhum resultado para "' + escHtml(filtro) + '"' : 'Nenhum participante ainda.'}
+      </td></tr></tbody></table>`;
+    return;
+  }
+
+  const linhas = filtrado.map(r => `
+    <tr>
+      <td class="td-nome">${escHtml(r.nome)}</td>
+      <td class="td-tel">${maskTel(r.telefone)}</td>
+      <td><div class="td-premio">${r.premio_icone} ${escHtml(r.premio_nome)}</div></td>
+      <td class="td-code">${escHtml(r.voucher_codigo)}</td>
+      <td class="td-date">${escHtml(r.criado_em)}</td>
+    </tr>`).join('');
+
+  document.getElementById('table-area').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Nome</th><th>Telefone</th><th>Prêmio</th><th>Voucher</th><th>Data/Hora</th>
+      </tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>`;
+}
+
+document.getElementById('search-inp').addEventListener('input', () => renderTabela(allRows));
+
+/* ── CSV ────────────────────────────────────────────────── */
+document.getElementById('btn-csv').addEventListener('click', () => {
+  if (!allRows.length) return;
+  const cab = ['Nome', 'Telefone', 'Premio', 'Voucher', 'Data/Hora'];
+  const linhas = allRows.map(r =>
+    [r.nome, r.telefone, r.premio_nome, r.voucher_codigo, r.criado_em]
+      .map(v => `"${String(v).replace(/"/g,'""')}"`)
+      .join(',')
+  );
+  const csv = '﻿' + [cab.join(','), ...linhas].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `sorteio-${hoje()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ── UTILS ──────────────────────────────────────────────── */
+function maskTel(t) {
+  const d = t.replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return t;
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function hoje() {
+  return new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+}
+</script>
+</body>
+</html>
