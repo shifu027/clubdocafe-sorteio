@@ -317,6 +317,7 @@
     .result-name { font-size: 1.55rem; }
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -386,47 +387,14 @@
 
 <script>
 /* ============================================================
-   CONFIG DE BRINDES — Probabilidades ponderadas
-   Ajuste as faixas (intervalos 1–100) conforme o estoque.
+   SUPABASE — Backend
    ============================================================ */
-const PRIZES = [
-  // [min, max, ícone, nome, descrição]
-  [1,  35, '🏷️', '5% de desconto',        'Válido na sua compra. Mostre esta tela no balcão para retirar.'],
-  [36, 65, '🏷️', '10% de desconto',       'Válido na sua compra. Mostre esta tela no balcão para retirar.'],
-  [66, 77, '☕', 'Café coado 150 ml',     'Mostre esta tela no balcão para retirar.'],
-  [78, 87, '☕', 'Expresso',              'Mostre esta tela no balcão para retirar.'],
-  [88, 93, '🥛', 'Cappuccino 200 ml',     'Mostre esta tela no balcão para retirar.'],
-  [94, 97, '🫐', 'Açaizinho tradicional', 'Mostre esta tela no balcão para retirar.'],
-  [98,100, '⚡', 'Açaízinho energético',  'O prêmio máximo! Mostre esta tela no balcão.'],
-];
-
-function sortear() {
-  const n = Math.floor(Math.random() * 100) + 1; // 1 a 100
-  for (const p of PRIZES) {
-    if (n >= p[0] && n <= p[1]) return { numero: n, icon: p[2], name: p[3], sub: p[4] };
-  }
-}
+const SUPABASE_URL  = 'https://ubheosijktvvnpgrsylm.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaGVvc2lqa3R2dm5wZ3JzeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjgzNDUsImV4cCI6MjA5NjE0NDM0NX0.CiyQLUiPwxcQ-4tp-LnVUp-eJNcGut5h4MTbPVnkPVw';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* ============================================================
-   PERSISTÊNCIA via localStorage (sem servidor / sem banco)
-   ============================================================ */
-const STORAGE_KEY = 'clubcafe_sorteio_v1';
-const participants = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-
-const normalize = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
-const cleanPhone = p => p.replace(/\D/g, '');
-
-function alreadyParticipated(name, phone) {
-  const n = normalize(name), p = cleanPhone(phone);
-  for (const key of Object.keys(participants)) {
-    const rec = participants[key];
-    if (rec.nameKey === n || rec.phone === p) return rec;
-  }
-  return null;
-}
-
-/* ============================================================
-   MÁSCARA DE TELEFONE
+   UTILITÁRIOS
    ============================================================ */
 function maskPhone(inp) {
   let v = inp.value.replace(/\D/g, '').slice(0, 11);
@@ -437,18 +405,10 @@ function maskPhone(inp) {
 }
 document.getElementById('inp-phone').addEventListener('input', function() { maskPhone(this); });
 
-function showError(id, show) {
-  document.getElementById(id).style.display = show ? 'block' : 'none';
-}
-
-/* ============================================================
-   GERAÇÃO DO VOUCHER
-   ============================================================ */
-function gerarCodigo() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return 'CC-' + code;
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  if (msg) { el.textContent = msg; el.style.display = 'block'; }
+  else      { el.style.display = 'none'; }
 }
 
 function dataHoje() {
@@ -457,59 +417,76 @@ function dataHoje() {
   });
 }
 
+async function getIP() {
+  try {
+    const r = await fetch('https://api64.ipify.org?format=json');
+    return (await r.json()).ip || '';
+  } catch { return ''; }
+}
+
 /* ============================================================
    HANDLER PRINCIPAL
    ============================================================ */
-document.getElementById('btn-sortear').addEventListener('click', function() {
-  const nameVal = document.getElementById('inp-name').value.trim();
-  const phoneVal = cleanPhone(document.getElementById('inp-phone').value);
+document.getElementById('btn-sortear').addEventListener('click', async function() {
+  const nomeVal  = document.getElementById('inp-name').value.trim();
+  const phoneRaw = document.getElementById('inp-phone').value;
 
   let ok = true;
-  if (!nameVal || nameVal.length < 2) { showError('err-name', true); ok = false; } else { showError('err-name', false); }
-  if (phoneVal.length < 10) { showError('err-phone', true); ok = false; } else { showError('err-phone', false); }
+  if (!nomeVal || nomeVal.length < 2) {
+    showError('err-name', 'Por favor, informe seu nome.'); ok = false;
+  } else { showError('err-name', null); }
+
+  if (phoneRaw.replace(/\D/g, '').length < 10) {
+    showError('err-phone', 'Informe um telefone válido (DDD + número).'); ok = false;
+  } else { showError('err-phone', null); }
+
   if (!ok) return;
 
-  // Já participou?
-  const existing = alreadyParticipated(nameVal, phoneVal);
-  if (existing) {
-    document.getElementById('form-view').style.display = 'none';
-    document.getElementById('already-sub').innerHTML =
-      `<strong>${existing.rawName}</strong>, você já participou e ganhou <strong>${existing.icon} ${existing.name}</strong>.<br><br>Cada cliente pode participar apenas uma vez. Apresente seu voucher <strong>${existing.codigo}</strong> no balcão.`;
-    document.getElementById('already-view').classList.add('visible');
-    return;
-  }
-
-  // Sortear
   this.disabled = true;
   document.getElementById('spin-wrap').classList.add('active');
 
-  setTimeout(() => {
-    const prize = sortear();
-    const codigo = gerarCodigo();
-    const key = Date.now().toString();
+  try {
+    const ip = await getIP();
 
-    participants[key] = {
-      nameKey: normalize(nameVal),
-      rawName: nameVal,
-      phone: phoneVal,
-      numero: prize.numero,
-      icon: prize.icon,
-      name: prize.name,
-      codigo: codigo,
-      data: new Date().toISOString()
-    };
+    const { data, error } = await db.rpc('realizar_sorteio', {
+      p_nome:     nomeVal,
+      p_telefone: phoneRaw,
+      p_ip:       ip
+    });
 
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(participants)); } catch(e) {}
+    if (error) throw error;
 
+    if (data.erro === 'ja_participou') {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('already-sub').innerHTML =
+        `Você já participou e ganhou <strong>${data.premio_nome}</strong>.<br><br>` +
+        `Apresente o voucher <strong>${data.voucher_codigo}</strong> no balcão.`;
+      document.getElementById('already-view').classList.add('visible');
+
+    } else if (data.erro === 'limite_ip_atingido') {
+      showError('err-name', 'Muitas participações deste local hoje. Tente amanhã.');
+
+    } else if (data.sucesso) {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('prize-icon').textContent  = data.premio_icone;
+      document.getElementById('prize-name').textContent  = data.premio_nome;
+      document.getElementById('prize-sub').innerHTML     =
+        `Olá, <strong>${nomeVal}</strong>! ${data.premio_descricao}.`;
+      document.getElementById('voucher-code').textContent = data.voucher_codigo;
+      document.getElementById('voucher-date').textContent = 'Válido em ' + dataHoje();
+      document.getElementById('result-view').classList.add('visible');
+
+    } else {
+      throw new Error('Resposta inesperada');
+    }
+
+  } catch (err) {
+    console.error(err);
+    showError('err-name', 'Erro ao conectar com o servidor. Tente novamente.');
+  } finally {
     document.getElementById('spin-wrap').classList.remove('active');
-    document.getElementById('form-view').style.display = 'none';
-    document.getElementById('prize-icon').textContent = prize.icon;
-    document.getElementById('prize-name').textContent = prize.name;
-    document.getElementById('prize-sub').innerHTML = `Olá, <strong>${nameVal}</strong>! ${prize.sub}`;
-    document.getElementById('voucher-code').textContent = codigo;
-    document.getElementById('voucher-date').textContent = 'Válido em ' + dataHoje();
-    document.getElementById('result-view').classList.add('visible');
-  }, 1300);
+    this.disabled = false;
+  }
 });
 </script>
 
