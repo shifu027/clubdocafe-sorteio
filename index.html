@@ -417,13 +417,6 @@ function dataHoje() {
   });
 }
 
-async function getIP() {
-  try {
-    const r = await fetch('https://api64.ipify.org?format=json');
-    return (await r.json()).ip || '';
-  } catch { return ''; }
-}
-
 /* ============================================================
    HANDLER PRINCIPAL
    ============================================================ */
@@ -446,12 +439,9 @@ document.getElementById('btn-sortear').addEventListener('click', async function(
   document.getElementById('spin-wrap').classList.add('active');
 
   try {
-    const ip = await getIP();
-
     const { data, error } = await db.rpc('realizar_sorteio', {
       p_nome:     nomeVal,
-      p_telefone: phoneRaw,
-      p_ip:       ip
+      p_telefone: phoneRaw
     });
 
     if (error) throw error;
