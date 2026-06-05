@@ -437,8 +437,8 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* ── ROLETA — SEGMENTOS (fatias iguais, visual limpo) ──── */
 const WHEEL_PRIZES = [
-  { key:'5% de desconto',        icon:'🏷️', label:'5% OFF' },
-  { key:'10% de desconto',       icon:'🏷️', label:'10% OFF' },
+  { key:'5% de desconto',        icon:'🏷️', label:'5%' },
+  { key:'10% de desconto',       icon:'🏷️', label:'10%' },
   { key:'Café coado 150 ml',     icon:'☕',  label:'Café' },
   { key:'Expresso',              icon:'☕',  label:'Expresso' },
   { key:'Cappuccino 200 ml',     icon:'🥛',  label:'Cappuccino' },
@@ -507,13 +507,13 @@ function drawWheel(angle) {
     const dir = flip ? -1 : 1;
 
     // emoji (mais perto da borda)
-    ctx.font = `${Math.round(W * 0.068)}px "Segoe UI Emoji", serif`;
-    ctx.fillText(seg.icon, dir * r * 0.74, 0);
+    ctx.font = `${Math.round(W * 0.060)}px "Segoe UI Emoji", serif`;
+    ctx.fillText(seg.icon, dir * r * 0.76, 0);
 
     // label (texto radial, menor)
     ctx.font = `600 ${Math.round(W * 0.036)}px "DM Sans", sans-serif`;
     ctx.fillStyle = '#F5E6D3';
-    ctx.fillText(seg.label, dir * r * 0.45, 0);
+    ctx.fillText(seg.label, dir * r * 0.42, 0);
     ctx.restore();
   });
 
