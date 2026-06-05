@@ -210,13 +210,17 @@
       <img src="logo.png" alt="Club do Café" />
     </div>
     <p class="login-title">Painel da Gerente</p>
-    <p class="login-sub">Acesso restrito — insira a senha para continuar</p>
+    <p class="login-sub">Acesso restrito — insira seu e-mail e senha</p>
+    <div class="field">
+      <label for="inp-email">E-mail</label>
+      <input id="inp-email" type="email" placeholder="seu@email.com" autocomplete="username" />
+    </div>
     <div class="field">
       <label for="inp-senha">Senha</label>
       <input id="inp-senha" type="password" placeholder="••••••••••" autocomplete="current-password" />
     </div>
     <button class="btn" id="btn-entrar">Entrar</button>
-    <p class="err-msg" id="err-login">Senha incorreta. Tente novamente.</p>
+    <p class="err-msg" id="err-login">E-mail ou senha incorretos. Tente novamente.</p>
   </div>
 </div>
 
@@ -299,21 +303,28 @@ let countdownTimer = null;
 document.getElementById('inp-senha').addEventListener('keydown', e => {
   if (e.key === 'Enter') tentarLogin();
 });
+document.getElementById('inp-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('inp-senha').focus();
+});
 document.getElementById('btn-entrar').addEventListener('click', tentarLogin);
 
 async function tentarLogin() {
+  const email = document.getElementById('inp-email').value.trim();
   const senha = document.getElementById('inp-senha').value;
-  if (!senha) return;
+  if (!email || !senha) return;
 
   const btn = document.getElementById('btn-entrar');
   btn.disabled = true; btn.textContent = 'Verificando…';
   document.getElementById('err-login').style.display = 'none';
 
-  const { data, error } = await db.rpc('listar_participantes', { p_senha: senha });
+  const { data, error } = await db.rpc('listar_participantes', {
+    p_email: email,
+    p_senha: senha
+  });
 
   btn.disabled = false; btn.textContent = 'Entrar';
 
-  if (error || data?.erro === 'senha_invalida') {
+  if (error || data?.erro === 'credenciais_invalidas') {
     document.getElementById('err-login').style.display = 'block';
     return;
   }
@@ -341,7 +352,11 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
 });
 
 async function carregar() {
-  const { data, error } = await db.rpc('listar_participantes', { p_senha: senhaAtual });
+  const email = document.getElementById('inp-email').value.trim();
+  const { data, error } = await db.rpc('listar_participantes', {
+    p_email: email,
+    p_senha: senhaAtual
+  });
   if (!error && data?.sucesso) renderDashboard(data);
 }
 
