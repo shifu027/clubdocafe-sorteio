@@ -176,26 +176,6 @@
   .btn:active { transform: scale(0.98); }
   .btn:disabled { opacity: 0.5; cursor: default; }
 
-  /* SPINNER */
-  .spin-wrap {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 0.7rem;
-    padding: 0.9rem 0;
-    font-size: 0.85rem;
-    color: var(--cream-dim);
-  }
-  .spin-wrap.active { display: flex; }
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid var(--border);
-    border-top-color: var(--cream);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
   /* RESULTADO */
   .result-view, .already-view {
     display: none;
@@ -313,37 +293,60 @@
   .wheel-view {
     display: none;
     text-align: center;
-    padding: 0.25rem 0 0.5rem;
+    padding: 0.5rem 0 0.75rem;
   }
   .wheel-view.visible { display: block; }
-  .wheel-wrap {
-    position: relative;
-    display: inline-block;
-    margin: 0.75rem auto 0;
-  }
-  .wheel-pointer {
-    position: absolute;
-    top: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.6rem;
-    color: var(--accent);
-    z-index: 2;
-    line-height: 1;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7));
-  }
-  #wheel-canvas {
-    display: block;
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px var(--accent), 0 8px 32px rgba(0,0,0,0.6);
-  }
   .wheel-label {
-    font-size: 0.72rem;
-    letter-spacing: 0.2em;
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--accent);
     font-weight: 500;
-    margin-bottom: 0.25rem;
+    margin-bottom: 1.1rem;
+    transition: opacity 0.3s;
+  }
+  .wheel-wrap {
+    position: relative;
+    display: inline-block;
+    margin: 0 auto;
+    padding: 10px;
+  }
+  /* halo de luz atrás da roleta */
+  .wheel-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -18px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,165,116,0.18) 0%, transparent 68%);
+    z-index: 0;
+    pointer-events: none;
+  }
+  /* ponteiro superior (triângulo) */
+  .wheel-pointer {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 13px solid transparent;
+    border-right: 13px solid transparent;
+    border-top: 22px solid var(--cream);
+    z-index: 3;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.6));
+  }
+  .wheel-pointer::after {
+    content: '';
+    position: absolute;
+    top: -25px; left: -7px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--bg-soft), 0 2px 5px rgba(0,0,0,0.5);
+  }
+  #wheel-canvas {
+    display: block;
+    position: relative;
+    z-index: 1;
   }
 
   /* RESPONSIVO */
@@ -391,9 +394,9 @@
 
     <!-- TELA 1.5: ROLETA -->
     <div class="wheel-view" id="wheel-view">
-      <p class="wheel-label">Sorteando seu brinde…</p>
+      <p class="wheel-label" id="wheel-label">Girando a roleta…</p>
       <div class="wheel-wrap">
-        <div class="wheel-pointer">▼</div>
+        <div class="wheel-pointer"></div>
         <canvas id="wheel-canvas"></canvas>
       </div>
     </div>
@@ -432,49 +435,51 @@ const SUPABASE_URL  = 'https://ubheosijktvvnpgrsylm.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaGVvc2lqa3R2dm5wZ3JzeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjgzNDUsImV4cCI6MjA5NjE0NDM0NX0.CiyQLUiPwxcQ-4tp-LnVUp-eJNcGut5h4MTbPVnkPVw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/* ── ROLETA — SEGMENTOS ───────────────────────────────── */
+/* ── ROLETA — SEGMENTOS (fatias iguais, visual limpo) ──── */
 const WHEEL_PRIZES = [
-  { key:'5% de desconto',        icon:'🏷️', label:'5%',         pct:35 },
-  { key:'10% de desconto',       icon:'🏷️', label:'10%',        pct:30 },
-  { key:'Café coado 150 ml',     icon:'☕',  label:'Café',       pct:12 },
-  { key:'Expresso',              icon:'☕',  label:'Expresso',   pct:10 },
-  { key:'Cappuccino 200 ml',     icon:'🥛',  label:'Cappuccino', pct:6  },
-  { key:'Açaizinho tradicional', icon:'🫐',  label:'Açaizinho',  pct:4  },
-  { key:'Açaízinho energético',  icon:'⚡',  label:'Açaí ⚡',   pct:3  },
+  { key:'5% de desconto',        icon:'🏷️', label:'5% OFF' },
+  { key:'10% de desconto',       icon:'🏷️', label:'10% OFF' },
+  { key:'Café coado 150 ml',     icon:'☕',  label:'Café' },
+  { key:'Expresso',              icon:'☕',  label:'Expresso' },
+  { key:'Cappuccino 200 ml',     icon:'🥛',  label:'Cappuccino' },
+  { key:'Açaizinho tradicional', icon:'🫐',  label:'Açaí' },
+  { key:'Açaízinho energético',  icon:'⚡',  label:'Açaí Energético' },
 ];
-const SEG_COLORS = ['#2D1B0E','#3E2714','#2D1B0E','#3E2714','#2D1B0E','#3E2714','#6B350E'];
-
-let _cum = 0;
+const N = WHEEL_PRIZES.length;
+const SEG = (2 * Math.PI) / N;
+// Tons alternados; última fatia (prêmio máximo) em destaque
 const SEGMENTS = WHEEL_PRIZES.map((p, i) => {
-  const s = (_cum / 100) * 2 * Math.PI;
-  _cum += p.pct;
-  const e = (_cum / 100) * 2 * Math.PI;
-  return { ...p, color: SEG_COLORS[i], startA: s, endA: e, midA: (s + e) / 2 };
+  const color = i === N - 1 ? '#6B3A12' : (i % 2 ? '#3A2415' : '#241509');
+  const s = i * SEG, e = (i + 1) * SEG;
+  return { ...p, color, startA: s, endA: e, midA: (s + e) / 2 };
 });
 
-/* ── ROLETA — ESTADO ──────────────────────────────────── */
-let wAngle = 0, wPhase = 'idle', wAnimFrame = null;
-let wSpinStart = null, wDecelStart = null;
-let wDecelFrom = 0, wDecelTo = 0;
-let wResult = null, wResultData = null, wLastTs = null;
-let wBtnRef = null, wNomeRef = '';
+let W_CSS = 300;            // tamanho em px CSS
+let wResultData = null, wNomeRef = '';
+let wRAF = null;
 
-function initCanvas() {
+/* Configura canvas com nitidez retina */
+function setupCanvas() {
   const c = document.getElementById('wheel-canvas');
-  const sz = Math.min(300, window.innerWidth - 80);
-  c.width = sz; c.height = sz;
-  wAngle = Math.random() * 2 * Math.PI;
-  drawWheel(wAngle);
+  const size = Math.min(300, window.innerWidth - 96);
+  const dpr = window.devicePixelRatio || 1;
+  W_CSS = size;
+  c.style.width = size + 'px';
+  c.style.height = size + 'px';
+  c.width = Math.round(size * dpr);
+  c.height = Math.round(size * dpr);
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 function drawWheel(angle) {
   const c = document.getElementById('wheel-canvas');
   if (!c) return;
   const ctx = c.getContext('2d');
-  const W = c.width, cx = W / 2, cy = W / 2, r = W / 2 - 2;
+  const W = W_CSS, cx = W / 2, cy = W / 2, r = W / 2 - 4;
 
   ctx.clearRect(0, 0, W, W);
 
+  // Fatias
   SEGMENTS.forEach(seg => {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
@@ -482,118 +487,113 @@ function drawWheel(angle) {
     ctx.closePath();
     ctx.fillStyle = seg.color;
     ctx.fill();
-    ctx.strokeStyle = '#D4A574';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(212,165,116,0.45)';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
+  });
 
-    // Texto (emoji + label)
+  // Conteúdo (emoji + label radial) — desenhado após as fatias
+  SEGMENTS.forEach(seg => {
     const ta = seg.midA + angle;
-    const tr = r * 0.64;
-    const arcLen = (seg.endA - seg.startA) * tr;
+    const norm = ((ta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const flip = norm > Math.PI / 2 && norm < 3 * Math.PI / 2;
+
     ctx.save();
-    ctx.translate(cx + Math.cos(ta) * tr, cy + Math.sin(ta) * tr);
-    ctx.rotate(ta + Math.PI / 2);
+    ctx.translate(cx, cy);
+    ctx.rotate(ta);
+    if (flip) ctx.rotate(Math.PI);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    const dir = flip ? -1 : 1;
 
-    const eSize = Math.round(W / 15);
-    ctx.font = `${eSize}px serif`;
-    ctx.fillText(seg.icon, 0, arcLen > W * 0.18 ? -eSize * 0.7 : 0);
+    // emoji (mais perto da borda)
+    ctx.font = `${Math.round(W * 0.068)}px "Segoe UI Emoji", serif`;
+    ctx.fillText(seg.icon, dir * r * 0.74, 0);
 
-    if (arcLen > W * 0.18) {
-      ctx.font = `600 ${Math.round(W / 25)}px DM Sans,sans-serif`;
-      ctx.fillStyle = '#F5E6D3';
-      ctx.fillText(seg.label, 0, eSize * 0.85);
-    }
+    // label (texto radial, menor)
+    ctx.font = `600 ${Math.round(W * 0.036)}px "DM Sans", sans-serif`;
+    ctx.fillStyle = '#F5E6D3';
+    ctx.fillText(seg.label, dir * r * 0.45, 0);
     ctx.restore();
   });
 
-  // Anel externo dourado
+  // Aro externo dourado
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, 2 * Math.PI);
   ctx.strokeStyle = '#D4A574';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 5;
   ctx.stroke();
 
-  // Centro
-  const cr = W * 0.1;
+  // Lâmpadas decorativas no aro (fixas)
+  const bulbs = 16, br = W * 0.013;
+  for (let i = 0; i < bulbs; i++) {
+    const a = -Math.PI / 2 + i * (2 * Math.PI / bulbs);
+    const bx = cx + Math.cos(a) * r, by = cy + Math.sin(a) * r;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, 2 * Math.PI);
+    ctx.fillStyle = i % 2 ? '#F5E6D3' : '#9C6B33';
+    ctx.fill();
+  }
+
+  // Cubo central
+  const cr = W * 0.11;
+  const grad = ctx.createRadialGradient(cx - cr*0.3, cy - cr*0.3, cr*0.2, cx, cy, cr);
+  grad.addColorStop(0, '#E8C9A0');
+  grad.addColorStop(1, '#C99858');
   ctx.beginPath();
   ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
-  ctx.fillStyle = '#D4A574';
+  ctx.fillStyle = grad;
   ctx.fill();
   ctx.strokeStyle = '#0F0E0C';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.fillStyle = '#0F0E0C';
-  ctx.font = `bold ${Math.round(cr * 0.9)}px Bagel Fat One,cursive`;
+  ctx.font = `${Math.round(cr * 1.0)}px "Bagel Fat One", cursive`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('CC', cx, cy + 1);
+  ctx.fillText('☕', cx, cy + 1);
 }
 
-/* ── ROLETA — ANIMAÇÃO ────────────────────────────────── */
-function wAnimate(ts) {
-  const dt = wLastTs ? Math.min((ts - wLastTs) / 1000, 0.05) : 0;
-  wLastTs = ts;
+/* Gira de forma determinística até parar no prêmio */
+function spinToPrize(prizeKey, onDone) {
+  const seg = SEGMENTS.find(s => s.key === prizeKey) || SEGMENTS[0];
+  const startAngle = Math.random() * 2 * Math.PI;
+  const turns = 5;
+  // Ponteiro no topo = -PI/2 ; queremos midA + final ≡ -PI/2 (mod 2π)
+  let finalAngle = -Math.PI / 2 - seg.midA;
+  while (finalAngle < startAngle + turns * 2 * Math.PI) finalAngle += 2 * Math.PI;
 
-  if (wPhase === 'idle') {
-    if (!wSpinStart) wSpinStart = ts;
-    const elapsed = (ts - wSpinStart) / 1000;
-    const speed = elapsed < 0.6
-      ? 2 * Math.PI * (elapsed / 0.6)   // rampa
-      : 2 * Math.PI;                     // 1 rot/s constante
-    wAngle += speed * dt;
-    drawWheel(wAngle);
+  const duration = 4000;
+  const t0 = performance.now();
 
-    if (wResult && elapsed >= 1.8) { startDecel(ts); return; }
-    wAnimFrame = requestAnimationFrame(wAnimate);
-
-  } else if (wPhase === 'decel') {
-    const t = Math.min((ts - wDecelStart) / 2400, 1);
-    const eased = 1 - Math.pow(1 - t, 3);
-    wAngle = wDecelFrom + (wDecelTo - wDecelFrom) * eased;
-    drawWheel(wAngle);
+  function frame(now) {
+    const t = Math.min((now - t0) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 4);          // ease-out quart
+    drawWheel(startAngle + (finalAngle - startAngle) * eased);
     if (t < 1) {
-      wAnimFrame = requestAnimationFrame(wAnimate);
+      wRAF = requestAnimationFrame(frame);
     } else {
-      wPhase = 'done';
-      setTimeout(showResult, 650);
+      const lbl = document.getElementById('wheel-label');
+      if (lbl) { lbl.textContent = '🎉 É o seu prêmio!'; }
+      setTimeout(onDone, 750);
     }
   }
-}
-
-function startDecel(ts) {
-  wPhase = 'decel';
-  wDecelStart = ts;
-  wDecelFrom = wAngle;
-  const seg = SEGMENTS.find(s => s.key === wResult);
-  if (!seg) { showResult(); return; }
-
-  // Ponteiro no topo = -PI/2; queremos midAngle + finalAngle ≡ -PI/2 (mod 2PI)
-  let target = -Math.PI / 2 - seg.midA;
-  while (target < wAngle + 2 * Math.PI) target += 2 * Math.PI;
-  wDecelTo = target;
-  wAnimFrame = requestAnimationFrame(wAnimate);
+  wRAF = requestAnimationFrame(frame);
 }
 
 function showResult() {
-  document.getElementById('wheel-view').classList.remove('visible');
-  document.getElementById('wheel-view').style.display = 'none';
+  const wv = document.getElementById('wheel-view');
+  wv.classList.remove('visible');
+  wv.style.display = 'none';
   if (!wResultData) return;
   const d = wResultData;
   document.getElementById('prize-icon').textContent  = d.premio_icone;
   document.getElementById('prize-name').textContent  = d.premio_nome;
   document.getElementById('prize-sub').innerHTML =
-    `Olá, <strong>${wNomeRef}</strong>! ${d.premio_descricao}.`;
+    `Olá, <strong>${escapeHtml(wNomeRef)}</strong>! ${d.premio_descricao}.`;
   document.getElementById('voucher-code').textContent = d.voucher_codigo;
   document.getElementById('voucher-date').textContent = 'Válido em ' + dataHoje();
   document.getElementById('result-view').classList.add('visible');
-}
-
-function cancelWheel() {
-  if (wAnimFrame) { cancelAnimationFrame(wAnimFrame); wAnimFrame = null; }
-  document.getElementById('wheel-view').style.display = 'none';
-  document.getElementById('wheel-view').classList.remove('visible');
 }
 
 /* ── UTILITÁRIOS ──────────────────────────────────────── */
@@ -610,6 +610,10 @@ function showError(id, msg) {
   const el = document.getElementById(id);
   if (msg) { el.textContent = msg; el.style.display = 'block'; }
   else      { el.style.display = 'none'; }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function dataHoje() {
@@ -630,65 +634,59 @@ document.getElementById('btn-sortear').addEventListener('click', async function(
   } else { showError('err-phone', null); }
   if (!ok) return;
 
-  this.disabled = true;
-  wBtnRef = this;
+  const btn = this;
+  btn.disabled = true;
+  const btnTxt = btn.textContent;
+  btn.textContent = 'Verificando…';
   wNomeRef = nomeVal;
 
-  // Esconder formulário e mostrar roleta
-  document.getElementById('form-view').style.display = 'none';
-  const wv = document.getElementById('wheel-view');
-  wv.style.display = 'block';
-  wv.classList.add('visible');
-
-  // Reset e iniciar animação
-  wResult = null; wResultData = null; wPhase = 'idle';
-  wSpinStart = null; wLastTs = null;
-  if (wAnimFrame) cancelAnimationFrame(wAnimFrame);
-  initCanvas();
-  wAnimFrame = requestAnimationFrame(wAnimate);
-
   try {
+    // 1) Consulta o servidor ANTES de mostrar qualquer animação
     const { data, error } = await db.rpc('realizar_sorteio', {
       p_nome: nomeVal, p_telefone: phoneRaw
     });
-
     if (error) throw error;
 
+    // 2) Casos que NÃO mostram a roleta
     if (data.erro === 'ja_participou') {
-      cancelWheel();
+      document.getElementById('form-view').style.display = 'none';
       document.getElementById('already-sub').innerHTML =
-        `Você já participou e ganhou <strong>${data.premio_nome}</strong>.<br><br>` +
-        `Apresente o voucher <strong>${data.voucher_codigo}</strong> no balcão.`;
+        `Você já participou e ganhou <strong>${escapeHtml(data.premio_nome)}</strong>.<br><br>` +
+        `Apresente o voucher <strong>${escapeHtml(data.voucher_codigo)}</strong> no balcão.`;
       document.getElementById('already-view').classList.add('visible');
-
-    } else if (data.erro === 'sorteio_encerrado') {
-      cancelWheel();
+      return;
+    }
+    if (data.erro === 'sorteio_encerrado') {
+      document.getElementById('form-view').style.display = 'none';
       document.getElementById('already-sub').innerHTML =
         'O sorteio de hoje foi encerrado.<br><br>' +
         'As vagas foram preenchidas. Volte na próxima promoção! ☕';
       document.getElementById('already-view').classList.add('visible');
-
-    } else if (data.erro === 'limite_ip_atingido') {
-      cancelWheel();
-      document.getElementById('form-view').style.display = 'block';
-      showError('err-name', 'Muitas participações deste local hoje. Tente amanhã.');
-      this.disabled = false;
-
-    } else if (data.sucesso) {
-      // Deixar a roleta parar no prêmio correto
-      wResultData = data;
-      wResult = data.premio_nome;
-
-    } else {
-      throw new Error('Resposta inesperada');
+      return;
     }
+    if (data.erro === 'limite_ip_atingido') {
+      btn.textContent = btnTxt; btn.disabled = false;
+      showError('err-name', 'Muitas participações deste local hoje. Tente amanhã.');
+      return;
+    }
+    if (!data.sucesso) throw new Error('Resposta inesperada');
+
+    // 3) Sucesso → mostra a roleta e gira até o prêmio sorteado
+    wResultData = data;
+    document.getElementById('form-view').style.display = 'none';
+    const wv = document.getElementById('wheel-view');
+    document.getElementById('wheel-label').textContent = 'Girando a roleta…';
+    wv.style.display = 'block';
+    wv.classList.add('visible');
+
+    if (wRAF) cancelAnimationFrame(wRAF);
+    setupCanvas();
+    spinToPrize(data.premio_nome, showResult);
 
   } catch (err) {
     console.error(err);
-    cancelWheel();
-    document.getElementById('form-view').style.display = 'block';
+    btn.textContent = btnTxt; btn.disabled = false;
     showError('err-name', 'Erro ao conectar com o servidor. Tente novamente.');
-    this.disabled = false;
   }
 });
 </script>
