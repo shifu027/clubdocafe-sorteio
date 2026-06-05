@@ -309,6 +309,43 @@
     opacity: 0.6;
   }
 
+  /* ROLETA */
+  .wheel-view {
+    display: none;
+    text-align: center;
+    padding: 0.25rem 0 0.5rem;
+  }
+  .wheel-view.visible { display: block; }
+  .wheel-wrap {
+    position: relative;
+    display: inline-block;
+    margin: 0.75rem auto 0;
+  }
+  .wheel-pointer {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.6rem;
+    color: var(--accent);
+    z-index: 2;
+    line-height: 1;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+  }
+  #wheel-canvas {
+    display: block;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--accent), 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .wheel-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+
   /* RESPONSIVO */
   @media (max-width: 380px) {
     .container { padding: 2rem 1rem 2rem; }
@@ -332,7 +369,7 @@
     <!-- TELA 1: FORMULÁRIO -->
     <div id="form-view">
       <div class="intro">
-        <span class="intro-badge">Raspe & Ganhe</span>
+        <span class="intro-badge">Cadastre &amp; Ganhe</span>
         <h1>Seu brinde está esperando</h1>
         <p>Preencha seus dados e descubra o que você acabou de ganhar.</p>
       </div>
@@ -350,10 +387,14 @@
       </div>
 
       <button class="btn" id="btn-sortear">Descobrir meu prêmio ✨</button>
+    </div>
 
-      <div class="spin-wrap" id="spin-wrap">
-        <div class="spinner"></div>
-        <span>Sorteando seu brinde...</span>
+    <!-- TELA 1.5: ROLETA -->
+    <div class="wheel-view" id="wheel-view">
+      <p class="wheel-label">Sorteando seu brinde…</p>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer">▼</div>
+        <canvas id="wheel-canvas"></canvas>
       </div>
     </div>
 
@@ -386,16 +427,176 @@
 </div>
 
 <script>
-/* ============================================================
-   SUPABASE — Backend
-   ============================================================ */
+/* ── SUPABASE ─────────────────────────────────────────── */
 const SUPABASE_URL  = 'https://ubheosijktvvnpgrsylm.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViaGVvc2lqa3R2dm5wZ3JzeWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NjgzNDUsImV4cCI6MjA5NjE0NDM0NX0.CiyQLUiPwxcQ-4tp-LnVUp-eJNcGut5h4MTbPVnkPVw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/* ============================================================
-   UTILITÁRIOS
-   ============================================================ */
+/* ── ROLETA — SEGMENTOS ───────────────────────────────── */
+const WHEEL_PRIZES = [
+  { key:'5% de desconto',        icon:'🏷️', label:'5%',         pct:35 },
+  { key:'10% de desconto',       icon:'🏷️', label:'10%',        pct:30 },
+  { key:'Café coado 150 ml',     icon:'☕',  label:'Café',       pct:12 },
+  { key:'Expresso',              icon:'☕',  label:'Expresso',   pct:10 },
+  { key:'Cappuccino 200 ml',     icon:'🥛',  label:'Cappuccino', pct:6  },
+  { key:'Açaizinho tradicional', icon:'🫐',  label:'Açaizinho',  pct:4  },
+  { key:'Açaízinho energético',  icon:'⚡',  label:'Açaí ⚡',   pct:3  },
+];
+const SEG_COLORS = ['#2D1B0E','#3E2714','#2D1B0E','#3E2714','#2D1B0E','#3E2714','#6B350E'];
+
+let _cum = 0;
+const SEGMENTS = WHEEL_PRIZES.map((p, i) => {
+  const s = (_cum / 100) * 2 * Math.PI;
+  _cum += p.pct;
+  const e = (_cum / 100) * 2 * Math.PI;
+  return { ...p, color: SEG_COLORS[i], startA: s, endA: e, midA: (s + e) / 2 };
+});
+
+/* ── ROLETA — ESTADO ──────────────────────────────────── */
+let wAngle = 0, wPhase = 'idle', wAnimFrame = null;
+let wSpinStart = null, wDecelStart = null;
+let wDecelFrom = 0, wDecelTo = 0;
+let wResult = null, wResultData = null, wLastTs = null;
+let wBtnRef = null, wNomeRef = '';
+
+function initCanvas() {
+  const c = document.getElementById('wheel-canvas');
+  const sz = Math.min(300, window.innerWidth - 80);
+  c.width = sz; c.height = sz;
+  wAngle = Math.random() * 2 * Math.PI;
+  drawWheel(wAngle);
+}
+
+function drawWheel(angle) {
+  const c = document.getElementById('wheel-canvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, cx = W / 2, cy = W / 2, r = W / 2 - 2;
+
+  ctx.clearRect(0, 0, W, W);
+
+  SEGMENTS.forEach(seg => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, seg.startA + angle, seg.endA + angle);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+    ctx.strokeStyle = '#D4A574';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Texto (emoji + label)
+    const ta = seg.midA + angle;
+    const tr = r * 0.64;
+    const arcLen = (seg.endA - seg.startA) * tr;
+    ctx.save();
+    ctx.translate(cx + Math.cos(ta) * tr, cy + Math.sin(ta) * tr);
+    ctx.rotate(ta + Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const eSize = Math.round(W / 15);
+    ctx.font = `${eSize}px serif`;
+    ctx.fillText(seg.icon, 0, arcLen > W * 0.18 ? -eSize * 0.7 : 0);
+
+    if (arcLen > W * 0.18) {
+      ctx.font = `600 ${Math.round(W / 25)}px DM Sans,sans-serif`;
+      ctx.fillStyle = '#F5E6D3';
+      ctx.fillText(seg.label, 0, eSize * 0.85);
+    }
+    ctx.restore();
+  });
+
+  // Anel externo dourado
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#D4A574';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Centro
+  const cr = W * 0.1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+  ctx.fillStyle = '#D4A574';
+  ctx.fill();
+  ctx.strokeStyle = '#0F0E0C';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#0F0E0C';
+  ctx.font = `bold ${Math.round(cr * 0.9)}px Bagel Fat One,cursive`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('CC', cx, cy + 1);
+}
+
+/* ── ROLETA — ANIMAÇÃO ────────────────────────────────── */
+function wAnimate(ts) {
+  const dt = wLastTs ? Math.min((ts - wLastTs) / 1000, 0.05) : 0;
+  wLastTs = ts;
+
+  if (wPhase === 'idle') {
+    if (!wSpinStart) wSpinStart = ts;
+    const elapsed = (ts - wSpinStart) / 1000;
+    const speed = elapsed < 0.6
+      ? 2 * Math.PI * (elapsed / 0.6)   // rampa
+      : 2 * Math.PI;                     // 1 rot/s constante
+    wAngle += speed * dt;
+    drawWheel(wAngle);
+
+    if (wResult && elapsed >= 1.8) { startDecel(ts); return; }
+    wAnimFrame = requestAnimationFrame(wAnimate);
+
+  } else if (wPhase === 'decel') {
+    const t = Math.min((ts - wDecelStart) / 2400, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    wAngle = wDecelFrom + (wDecelTo - wDecelFrom) * eased;
+    drawWheel(wAngle);
+    if (t < 1) {
+      wAnimFrame = requestAnimationFrame(wAnimate);
+    } else {
+      wPhase = 'done';
+      setTimeout(showResult, 650);
+    }
+  }
+}
+
+function startDecel(ts) {
+  wPhase = 'decel';
+  wDecelStart = ts;
+  wDecelFrom = wAngle;
+  const seg = SEGMENTS.find(s => s.key === wResult);
+  if (!seg) { showResult(); return; }
+
+  // Ponteiro no topo = -PI/2; queremos midAngle + finalAngle ≡ -PI/2 (mod 2PI)
+  let target = -Math.PI / 2 - seg.midA;
+  while (target < wAngle + 2 * Math.PI) target += 2 * Math.PI;
+  wDecelTo = target;
+  wAnimFrame = requestAnimationFrame(wAnimate);
+}
+
+function showResult() {
+  document.getElementById('wheel-view').classList.remove('visible');
+  document.getElementById('wheel-view').style.display = 'none';
+  if (!wResultData) return;
+  const d = wResultData;
+  document.getElementById('prize-icon').textContent  = d.premio_icone;
+  document.getElementById('prize-name').textContent  = d.premio_nome;
+  document.getElementById('prize-sub').innerHTML =
+    `Olá, <strong>${wNomeRef}</strong>! ${d.premio_descricao}.`;
+  document.getElementById('voucher-code').textContent = d.voucher_codigo;
+  document.getElementById('voucher-date').textContent = 'Válido em ' + dataHoje();
+  document.getElementById('result-view').classList.add('visible');
+}
+
+function cancelWheel() {
+  if (wAnimFrame) { cancelAnimationFrame(wAnimFrame); wAnimFrame = null; }
+  document.getElementById('wheel-view').style.display = 'none';
+  document.getElementById('wheel-view').classList.remove('visible');
+}
+
+/* ── UTILITÁRIOS ──────────────────────────────────────── */
 function maskPhone(inp) {
   let v = inp.value.replace(/\D/g, '').slice(0, 11);
   if (v.length > 6) v = '(' + v.slice(0,2) + ') ' + v.slice(2,7) + '-' + v.slice(7);
@@ -403,7 +604,7 @@ function maskPhone(inp) {
   else if (v.length > 0) v = '(' + v;
   inp.value = v;
 }
-document.getElementById('inp-phone').addEventListener('input', function() { maskPhone(this); });
+document.getElementById('inp-phone').addEventListener('input', function(){ maskPhone(this); });
 
 function showError(id, msg) {
   const el = document.getElementById(id);
@@ -412,14 +613,10 @@ function showError(id, msg) {
 }
 
 function dataHoje() {
-  return new Date().toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  return new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
 }
 
-/* ============================================================
-   HANDLER PRINCIPAL
-   ============================================================ */
+/* ── HANDLER PRINCIPAL ────────────────────────────────── */
 document.getElementById('btn-sortear').addEventListener('click', async function() {
   const nomeVal  = document.getElementById('inp-name').value.trim();
   const phoneRaw = document.getElementById('inp-phone').value;
@@ -428,50 +625,59 @@ document.getElementById('btn-sortear').addEventListener('click', async function(
   if (!nomeVal || nomeVal.length < 2) {
     showError('err-name', 'Por favor, informe seu nome.'); ok = false;
   } else { showError('err-name', null); }
-
-  if (phoneRaw.replace(/\D/g, '').length < 10) {
+  if (phoneRaw.replace(/\D/g,'').length < 10) {
     showError('err-phone', 'Informe um telefone válido (DDD + número).'); ok = false;
   } else { showError('err-phone', null); }
-
   if (!ok) return;
 
   this.disabled = true;
-  document.getElementById('spin-wrap').classList.add('active');
+  wBtnRef = this;
+  wNomeRef = nomeVal;
+
+  // Esconder formulário e mostrar roleta
+  document.getElementById('form-view').style.display = 'none';
+  const wv = document.getElementById('wheel-view');
+  wv.style.display = 'block';
+  wv.classList.add('visible');
+
+  // Reset e iniciar animação
+  wResult = null; wResultData = null; wPhase = 'idle';
+  wSpinStart = null; wLastTs = null;
+  if (wAnimFrame) cancelAnimationFrame(wAnimFrame);
+  initCanvas();
+  wAnimFrame = requestAnimationFrame(wAnimate);
 
   try {
     const { data, error } = await db.rpc('realizar_sorteio', {
-      p_nome:     nomeVal,
-      p_telefone: phoneRaw
+      p_nome: nomeVal, p_telefone: phoneRaw
     });
 
     if (error) throw error;
 
     if (data.erro === 'ja_participou') {
-      document.getElementById('form-view').style.display = 'none';
+      cancelWheel();
       document.getElementById('already-sub').innerHTML =
         `Você já participou e ganhou <strong>${data.premio_nome}</strong>.<br><br>` +
         `Apresente o voucher <strong>${data.voucher_codigo}</strong> no balcão.`;
       document.getElementById('already-view').classList.add('visible');
 
     } else if (data.erro === 'sorteio_encerrado') {
-      document.getElementById('form-view').style.display = 'none';
+      cancelWheel();
       document.getElementById('already-sub').innerHTML =
         'O sorteio de hoje foi encerrado.<br><br>' +
         'As vagas foram preenchidas. Volte na próxima promoção! ☕';
       document.getElementById('already-view').classList.add('visible');
 
     } else if (data.erro === 'limite_ip_atingido') {
+      cancelWheel();
+      document.getElementById('form-view').style.display = 'block';
       showError('err-name', 'Muitas participações deste local hoje. Tente amanhã.');
+      this.disabled = false;
 
     } else if (data.sucesso) {
-      document.getElementById('form-view').style.display = 'none';
-      document.getElementById('prize-icon').textContent  = data.premio_icone;
-      document.getElementById('prize-name').textContent  = data.premio_nome;
-      document.getElementById('prize-sub').innerHTML     =
-        `Olá, <strong>${nomeVal}</strong>! ${data.premio_descricao}.`;
-      document.getElementById('voucher-code').textContent = data.voucher_codigo;
-      document.getElementById('voucher-date').textContent = 'Válido em ' + dataHoje();
-      document.getElementById('result-view').classList.add('visible');
+      // Deixar a roleta parar no prêmio correto
+      wResultData = data;
+      wResult = data.premio_nome;
 
     } else {
       throw new Error('Resposta inesperada');
@@ -479,9 +685,9 @@ document.getElementById('btn-sortear').addEventListener('click', async function(
 
   } catch (err) {
     console.error(err);
+    cancelWheel();
+    document.getElementById('form-view').style.display = 'block';
     showError('err-name', 'Erro ao conectar com o servidor. Tente novamente.');
-  } finally {
-    document.getElementById('spin-wrap').classList.remove('active');
     this.disabled = false;
   }
 });
